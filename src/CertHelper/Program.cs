@@ -8,20 +8,56 @@ class Program
 {
     static void Main(string[] args)
     {
+#if DEBUG
+        string outputDirectory = @"D:\certs\";
+        string signingDistinguishedName = "Development Signing Certificate";
+        string encryptionDistinguishedName = "Development Encryption Certificate";
+        int years = 5;
+        bool exportCert = false;
+#else
+        if (args.Length < 5)
+        {
+            Console.WriteLine("Использование: программа <путь_к_папке> <signing_distinguished_name> <encryption_distinguished_name> <срок_в_годах> <cert>");
+            return;
+        }
+
+        string outputDirectory = args[0];
+        string signingDistinguishedName = args[1];
+        string encryptionDistinguishedName = args[2];
+
+        if (!int.TryParse(args[3], out int years) || years <= 0)
+        {
+            Console.WriteLine("Срок действия сертификата должен быть положительным числом.");
+            return;
+        }
+
+        if (!bool.TryParse(args[4], out bool exportCert))
+        {
+            Console.WriteLine("cert: может принимать значения true или false.");
+            return;
+        }
+
+        if (!Directory.Exists(outputDirectory))
+        {
+            Console.WriteLine($"Указанная папка не существует: {outputDirectory}");
+            return;
+        }
+#endif
+
         var signingCert = CreateCertificate(
-            "CN=Renna EStore Signing Certificate",
-            "Renna EStore Signing Certificate",
+            $"CN={signingDistinguishedName}",
+            $"{signingDistinguishedName}",
             X509KeyUsageFlags.DigitalSignature,
-            DateTimeOffset.UtcNow.AddYears(5));
+            DateTimeOffset.UtcNow.AddYears(years));
 
         var encryptionCert = CreateCertificate(
-            "CN=Renna EStore Encryption Certificate",
-            "Renna EStore Encryption Certificate",
+            $"CN={encryptionDistinguishedName}",
+            $"{encryptionDistinguishedName}",
             X509KeyUsageFlags.KeyEncipherment,
-            DateTimeOffset.UtcNow.AddYears(5));
+            DateTimeOffset.UtcNow.AddYears(years));
 
-        ExportCertificate(signingCert, @"D:\certs");
-        ExportCertificate(encryptionCert, @"D:\certs");
+        ExportCertificate(signingCert, outputDirectory, exportCert);
+        ExportCertificate(encryptionCert, outputDirectory, exportCert);
     }
 
     static X509Certificate2 CreateCertificate(
@@ -44,7 +80,7 @@ class Program
         return certificate;
     }
 
-    static void ExportCertificate(X509Certificate2 certificate, string path)
+    static void ExportCertificate(X509Certificate2 certificate, string path, bool exportCert)
     {
         var filename = certificate.Subject
             .ToLower()
@@ -57,6 +93,10 @@ class Program
         }
 
         File.WriteAllBytes(Path.Combine(path, filename + ".pfx"), certificate.Export(X509ContentType.Pfx, string.Empty));
-        File.WriteAllBytes(Path.Combine(path, filename + ".cer"), certificate.Export(X509ContentType.Cert, string.Empty));
+
+        if (exportCert)
+        {
+            File.WriteAllBytes(Path.Combine(path, filename + ".cer"), certificate.Export(X509ContentType.Cert, string.Empty));
+        }
     }
 }
